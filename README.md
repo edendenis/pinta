@@ -91,3 +91,4 @@ catfish "$search_dir"
 ## Referências
 
 [1] OPENAI. ***Instalar catfish no Linux Ubuntu***. Disponível em: <https://chatgpt.com/c/6862cf14-11c8-8002-8a1d-96488e72f5cf>. ChatGPT. Acessado em: 11/03/2025 14:23.
+
