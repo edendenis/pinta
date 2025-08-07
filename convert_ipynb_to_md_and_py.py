@@ -26,8 +26,13 @@
 
 # %%
 import os
-from nbconvert import MarkdownExporter, PythonExporter
-import nbformat
+import json
+
+try:
+    from nbconvert import MarkdownExporter, PythonExporter
+except ModuleNotFoundError:
+    MarkdownExporter = None
+    PythonExporter = None
 
 # Definindo o nome do arquivo que deve ser excluído das subpastas
 excluded_file = 'convert_ipynb_to_md.ipynb'
@@ -43,35 +48,54 @@ for dirpath, dirnames, filenames in os.walk('.'):
 
         if filename == 'README.ipynb':
             try:
-                # Tentando ler o arquivo .ipynb para verificar se é um JSON válido
-                with open(full_path, 'r') as file:
-                    nbformat.read(file, as_version=4)
+                with open(full_path, 'r', encoding='utf-8') as file:
+                    notebook = json.load(file)
 
-                # Criando um objeto MarkdownExporter
-                markdown_exporter = MarkdownExporter()
-                # Criando um objeto PythonExporter
-                python_exporter = PythonExporter()
-
-                # Exportando o arquivo .ipynb para código Markdown
-                markdown_code, _ = markdown_exporter.from_filename(full_path)
-                # Exportando o arquivo .ipynb para código Python
-                python_code, _ = python_exporter.from_filename(full_path)
-
-                # Definindo o nome do arquivo de saída .md
                 markdown_output_filename = full_path.replace('.ipynb', '.md')
-                # Definindo o nome do arquivo de saída .py
                 python_output_filename = full_path.replace('.ipynb', '.py')
 
-                # Escrevendo o código Markdown no arquivo de saída
-                with open(markdown_output_filename, 'w') as file:
+                if MarkdownExporter and PythonExporter:
+                    markdown_exporter = MarkdownExporter()
+                    python_exporter = PythonExporter()
+                    markdown_code, _ = markdown_exporter.from_filename(full_path)
+                    python_code, _ = python_exporter.from_filename(full_path)
+                else:
+                    md_lines = []
+                    py_lines = ['#!/usr/bin/env python', '# -*- coding: utf-8 -*-', '']
+                    for cell in notebook['cells']:
+                        if cell['cell_type'] == 'markdown':
+                            source = cell['source']
+                            if isinstance(source, list):
+                                lines = [line.rstrip('\n') for line in source]
+                            else:
+                                lines = source.splitlines()
+                            md_lines.extend([line + '\n' for line in lines])
+                            md_lines.append('\n')
+                            for line in lines:
+                                py_lines.append('# ' + line)
+                            py_lines.append('#')
+                        elif cell['cell_type'] == 'code':
+                            source = cell['source']
+                            if isinstance(source, list):
+                                code = [line.rstrip('\n') for line in source]
+                            else:
+                                code = source.splitlines()
+                            md_lines.append('```python\n')
+                            md_lines.extend([line + '\n' for line in code])
+                            md_lines.append('```\n\n')
+                            py_lines.extend(code)
+                            py_lines.append('')
+                    markdown_code = ''.join(md_lines)
+                    python_code = '\n'.join(py_lines)
+
+                with open(markdown_output_filename, 'w', encoding='utf-8') as file:
                     file.write(markdown_code)
-                # Escrevendo o código Python no arquivo de saída
-                with open(python_output_filename, 'w') as file:
+                with open(python_output_filename, 'w', encoding='utf-8') as file:
                     file.write(python_code)
 
                 print(f'{full_path} was successfully converted to {markdown_output_filename} and {python_output_filename}')
 
-            except nbformat.reader.NotJSONError as e:
+            except json.JSONDecodeError as e:
                 print(f'Error processing {full_path}: File is not valid JSON - {e}')
 
         # Verificando se o arquivo é o que deve ser excluído e se não está na pasta raiz
